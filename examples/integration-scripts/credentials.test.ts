@@ -9,6 +9,8 @@ import {
 import { retry } from './utils/retry';
 import { getOrCreateClient } from './utils/test-setup';
 import { randomUUID } from 'crypto';
+import { step } from './utils/test-step';
+
 const { vleiServerUrl, witnessIds } = resolveEnvironment();
 
 const WAN_WITNESS_AID = witnessIds[0];
@@ -31,19 +33,6 @@ function createTimestamp() {
     return new Date().toISOString().replace('Z', '000+00:00');
 }
 
-let issuerClient: SignifyClient;
-let holderClient: SignifyClient;
-let verifierClient: SignifyClient;
-let issuerAid: { name: string; prefix: string };
-let holderAid: { name: string; prefix: string };
-let verifierAid: { name: string; prefix: string };
-let registry: {
-    name: unknown;
-    regk: string;
-};
-let qviCredentialId: string;
-let leCredentialId: string;
-
 async function createAid(client: signify.SignifyClient, name: string) {
     const verifierIcpRes = await client.identifiers().create(name, {
         toad: 3,
@@ -55,22 +44,20 @@ async function createAid(client: signify.SignifyClient, name: string) {
     return hab;
 }
 
-describe('setup clients, aids and oobis', () => {
-    test('setup clients', async () => {
-        [issuerClient, holderClient, verifierClient] = await Promise.all([
-            getOrCreateClient(),
-            getOrCreateClient(),
-            getOrCreateClient(),
-        ]);
+test('signle signature credentials', async () => {
+    const [issuerClient, holderClient, verifierClient] = await Promise.all([
+        getOrCreateClient(),
+        getOrCreateClient(),
+        getOrCreateClient(),
+    ]);
 
-        [issuerAid, holderAid, verifierAid] = await Promise.all([
-            createAid(issuerClient, 'issuer'),
-            createAid(holderClient, 'holder'),
-            createAid(verifierClient, 'verifier'),
-        ]);
-    });
+    const [issuerAid, holderAid, verifierAid] = await Promise.all([
+        createAid(issuerClient, 'issuer'),
+        createAid(holderClient, 'holder'),
+        createAid(verifierClient, 'verifier'),
+    ]);
 
-    test('resolve oobis', async () => {
+    await step('Resolve oobis', async () => {
         const [issAgentOOBI, holderAgentOOBI, vfyAgentOOBI] = await Promise.all(
             [
                 issuerClient.oobis().get(issuerAid.name, 'agent'),
@@ -103,7 +90,7 @@ describe('setup clients, aids and oobis', () => {
         ]);
     });
 
-    test('issuer create registry', async () => {
+    const registry = await step('Create registry', async () => {
         const registryName = 'vLEI-test-registry';
         const regResult = await issuerClient
             .registries()
@@ -111,12 +98,13 @@ describe('setup clients, aids and oobis', () => {
 
         await waitOperation(issuerClient, await regResult.op());
         const registries = await issuerClient.registries().list(issuerAid.name);
-        registry = registries[0];
+        const registry: { name: string; regk: string } = registries[0];
         assert.equal(registries.length, 1);
         assert.equal(registry.name, registryName);
+        return registry;
     });
 
-    test('issuer can get schemas', async () => {
+    await step('issuer can get schemas', async () => {
         const issuerQviSchema = await issuerClient
             .schemas()
             .get(QVI_SCHEMA_SAID);
@@ -128,14 +116,12 @@ describe('setup clients, aids and oobis', () => {
         assert.equal(issuerLeSchema.$id, LE_SCHEMA_SAID);
     });
 
-    test('holder can list schemas', async () => {
+    await step('holder can list schemas', async () => {
         const holderSchemas = await holderClient.schemas().list();
         assert.equal(holderSchemas.length, 2);
     });
-});
 
-describe('QVI credential creation', () => {
-    test('create QVI credential', async () => {
+    const qviCredentialId = await step('create QVI credential', async () => {
         const vcdata = {
             LEI: '5493001KJTIIGC8Y1R17',
         };
@@ -149,10 +135,10 @@ describe('QVI credential creation', () => {
         });
 
         await waitOperation(issuerClient, issResult.op);
-        qviCredentialId = issResult.acdc.ked.d;
+        return issResult.acdc.ked.d as string;
     });
 
-    test('issuer list credentials', async () => {
+    await step('issuer list credentials', async () => {
         const issuerCredentials = await issuerClient.credentials().list();
         assert(issuerCredentials.length >= 1);
         assert.equal(issuerCredentials[0].sad.s, QVI_SCHEMA_SAID);
@@ -160,7 +146,7 @@ describe('QVI credential creation', () => {
         assert.equal(issuerCredentials[0].status.s, '0');
     });
 
-    test('issuer list credentials with filters', async () => {
+    await step('issuer list credentials with filter', async () => {
         expect(
             await issuerClient
                 .credentials()
@@ -200,7 +186,7 @@ describe('QVI credential creation', () => {
         ).toHaveLength(0);
     });
 
-    test('issuer get credential by id', async () => {
+    await step('issuer get credential by id', async () => {
         const issuerCredential = await issuerClient
             .credentials()
             .get(issuerAid.name, qviCredentialId);
@@ -209,7 +195,7 @@ describe('QVI credential creation', () => {
         assert.equal(issuerCredential.status.s, '0');
     });
 
-    test('issuer IPEX grant', async () => {
+    await step('issuer IPEX grant', async () => {
         const dt = createTimestamp();
         const issuerCredential = await issuerClient
             .credentials()
@@ -233,7 +219,7 @@ describe('QVI credential creation', () => {
             ]);
     });
 
-    test('holder IPEX admit', async () => {
+    await step('holder IPEX admit', async () => {
         const holderNotifications = await waitForNotifications(
             holderClient,
             '/exn/ipex/grant'
@@ -255,7 +241,7 @@ describe('QVI credential creation', () => {
         await holderClient.notifications().mark(grantNotification.i);
     });
 
-    test('holder has credential', async () => {
+    await step('holder has credential', async () => {
         const holderCredential = await retry(async () => {
             const result = await holderClient
                 .credentials()
@@ -269,7 +255,7 @@ describe('QVI credential creation', () => {
         assert(holderCredential.atc !== undefined);
     });
 
-    test('holder IPEX present', async () => {
+    await step('holder IPEX present', async () => {
         const holderCredential = await holderClient
             .credentials()
             .get(holderAid.name, qviCredentialId);
@@ -297,7 +283,7 @@ describe('QVI credential creation', () => {
             );
     });
 
-    test('verifier receives IPEX grant', async () => {
+    await step('verifier receives IPEX grant', async () => {
         const verifierNotifications = await waitForNotifications(
             verifierClient,
             '/exn/ipex/grant'
@@ -330,19 +316,14 @@ describe('QVI credential creation', () => {
         assert.equal(verifierCredential.sad.i, issuerAid.prefix);
         assert.equal(verifierCredential.status.s, '0'); // 0 = issued
     });
-});
 
-describe('Chained (LE) credential creation', () => {
-    let holderRegistry: { regk: string };
-    let legalEntityClient: SignifyClient;
-    let legalEntityAid: { name: string; prefix: string };
+    const legalEntityClient: SignifyClient = await getOrCreateClient();
+    const legalEntityAid: { name: string; prefix: string } = await createAid(
+        legalEntityClient,
+        'legal-entity'
+    );
 
-    test('setup LE client', async () => {
-        legalEntityClient = await getOrCreateClient();
-        legalEntityAid = await createAid(legalEntityClient, 'legal-entity');
-    });
-
-    test('resolve oobis', async () => {
+    await step('resolve oobis', async () => {
         const [holderAgentOOBI, legalEntityOOBI] = await Promise.all([
             holderClient.oobis().get(holderAid.name, 'agent'),
             legalEntityClient.oobis().get(legalEntityAid.name, 'agent'),
@@ -367,54 +348,62 @@ describe('Chained (LE) credential creation', () => {
         ]);
     });
 
-    test('holder create registry for LE credential', async () => {
-        const registryName = 'vLEI-test-registry';
-        const regResult = await holderClient
-            .registries()
-            .create({ name: holderAid.name, registryName: registryName });
+    const holderRegistry: { regk: string } = await step(
+        'holder create registry for LE credential',
+        async () => {
+            const registryName = 'vLEI-test-registry';
+            const regResult = await holderClient
+                .registries()
+                .create({ name: holderAid.name, registryName: registryName });
 
-        await waitOperation(holderClient, await regResult.op());
-        const registries = await holderClient.registries().list(holderAid.name);
-        assert(registries.length >= 1);
-        holderRegistry = registries[0];
-    });
+            await waitOperation(holderClient, await regResult.op());
+            const registries = await holderClient
+                .registries()
+                .list(holderAid.name);
+            assert(registries.length >= 1);
+            return registries[0];
+        }
+    );
 
-    test('holder create LE (chained) credential', async () => {
-        const qviCredential = await holderClient
-            .credentials()
-            .get(holderAid.name, qviCredentialId);
+    const leCredentialId = await step(
+        'holder create LE (chained) credential',
+        async () => {
+            const qviCredential = await holderClient
+                .credentials()
+                .get(holderAid.name, qviCredentialId);
 
-        const result = await holderClient.credentials().issue({
-            issuerName: holderAid.name,
-            recipient: legalEntityAid.prefix,
-            registryId: holderRegistry.regk,
-            schemaId: LE_SCHEMA_SAID,
-            data: {
-                LEI: '5493001KJTIIGC8Y1R17',
-            },
-            rules: Saider.saidify({
-                d: '',
-                usageDisclaimer: {
-                    l: 'Usage of a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, does not assert that the Legal Entity is trustworthy, honest, reputable in its business dealings, safe to do business with, or compliant with any laws or that an implied or expressly intended purpose will be fulfilled.',
+            const result = await holderClient.credentials().issue({
+                issuerName: holderAid.name,
+                recipient: legalEntityAid.prefix,
+                registryId: holderRegistry.regk,
+                schemaId: LE_SCHEMA_SAID,
+                data: {
+                    LEI: '5493001KJTIIGC8Y1R17',
                 },
-                issuanceDisclaimer: {
-                    l: 'All information in a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, is accurate as of the date the validation process was complete. The vLEI Credential has been issued to the legal entity or person named in the vLEI Credential as the subject; and the qualified vLEI Issuer exercised reasonable care to perform the validation process set forth in the vLEI Ecosystem Governance Framework.',
-                },
-            })[1],
-            source: Saider.saidify({
-                d: '',
-                qvi: {
-                    n: qviCredential.sad.d,
-                    s: qviCredential.sad.s,
-                },
-            })[1],
-        });
+                rules: Saider.saidify({
+                    d: '',
+                    usageDisclaimer: {
+                        l: 'Usage of a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, does not assert that the Legal Entity is trustworthy, honest, reputable in its business dealings, safe to do business with, or compliant with any laws or that an implied or expressly intended purpose will be fulfilled.',
+                    },
+                    issuanceDisclaimer: {
+                        l: 'All information in a valid, unexpired, and non-revoked vLEI Credential, as defined in the associated Ecosystem Governance Framework, is accurate as of the date the validation process was complete. The vLEI Credential has been issued to the legal entity or person named in the vLEI Credential as the subject; and the qualified vLEI Issuer exercised reasonable care to perform the validation process set forth in the vLEI Ecosystem Governance Framework.',
+                    },
+                })[1],
+                source: Saider.saidify({
+                    d: '',
+                    qvi: {
+                        n: qviCredential.sad.d,
+                        s: qviCredential.sad.s,
+                    },
+                })[1],
+            });
 
-        await waitOperation(holderClient, result.op);
-        leCredentialId = result.acdc.ked.d;
-    });
+            await waitOperation(holderClient, result.op);
+            return result.acdc.ked.d;
+        }
+    );
 
-    test('LE credential IPEX grant', async () => {
+    await step('LE credential IPEX grant', async () => {
         const dt = createTimestamp();
         const leCredential = await holderClient
             .credentials()
@@ -438,7 +427,7 @@ describe('Chained (LE) credential creation', () => {
             ]);
     });
 
-    test('Legal Entity IPEX admit', async () => {
+    await step('Legal Entity IPEX admit', async () => {
         const notifications = await waitForNotifications(
             legalEntityClient,
             '/exn/ipex/grant'
@@ -463,7 +452,7 @@ describe('Chained (LE) credential creation', () => {
         await legalEntityClient.notifications().mark(grantNotification.i);
     });
 
-    test('Legal Entity has chained credential', async () => {
+    await step('Legal Entity has chained credential', async () => {
         const legalEntityCredential = await retry(async () =>
             legalEntityClient
                 .credentials()
