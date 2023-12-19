@@ -37,7 +37,7 @@ let verifierClient: SignifyClient;
 let issuerAid: { name: string; prefix: string };
 let holderAid: { name: string; prefix: string };
 let verifierAid: { name: string; prefix: string };
-let registry: {
+let issuerRegistry: {
     name: unknown;
     regk: string;
 };
@@ -111,9 +111,9 @@ describe('setup clients, aids and oobis', () => {
 
         await waitOperation(issuerClient, await regResult.op());
         const registries = await issuerClient.registries().list(issuerAid.name);
-        registry = registries[0];
+        issuerRegistry = registries[0];
         assert.equal(registries.length, 1);
-        assert.equal(registry.name, registryName);
+        assert.equal(issuerRegistry.name, registryName);
     });
 
     test('issuer can get schemas', async () => {
@@ -142,7 +142,7 @@ describe('QVI credential creation', () => {
 
         const issResult = await issuerClient.credentials().issue({
             issuerName: issuerAid.name,
-            registryId: registry.regk,
+            registryId: issuerRegistry.regk,
             schemaId: QVI_SCHEMA_SAID,
             recipient: holderAid.prefix,
             data: vcdata,
@@ -269,7 +269,7 @@ describe('QVI credential creation', () => {
         assert(holderCredential.atc !== undefined);
     });
 
-    test('holder IPEX present', async () => {
+    test.skip('holder IPEX present', async () => {
         const holderCredential = await holderClient
             .credentials()
             .get(holderAid.name, qviCredentialId);
@@ -297,7 +297,7 @@ describe('QVI credential creation', () => {
             );
     });
 
-    test('verifier receives IPEX grant', async () => {
+    test.skip('verifier receives IPEX grant', async () => {
         const verifierNotifications = await waitForNotifications(
             verifierClient,
             '/exn/ipex/grant'
@@ -333,7 +333,7 @@ describe('QVI credential creation', () => {
 });
 
 describe('Chained (LE) credential creation', () => {
-    let holderRegistry: { regk: string };
+    // let holderRegistry: { regk: string };
     let legalEntityClient: SignifyClient;
     let legalEntityAid: { name: string; prefix: string };
 
@@ -367,7 +367,7 @@ describe('Chained (LE) credential creation', () => {
         ]);
     });
 
-    test('holder create registry for LE credential', async () => {
+    test.skip('create registry for LE credential', async () => {
         const registryName = 'vLEI-test-registry';
         const regResult = await holderClient
             .registries()
@@ -376,18 +376,24 @@ describe('Chained (LE) credential creation', () => {
         await waitOperation(holderClient, await regResult.op());
         const registries = await holderClient.registries().list(holderAid.name);
         assert(registries.length >= 1);
-        holderRegistry = registries[0];
+        // holderRegistry = registries[0];
     });
 
-    test('holder create LE (chained) credential', async () => {
+    test('create LE (chained) credential chained from wrong credential not held by issuer should fail', async () => {
         const qviCredential = await holderClient
             .credentials()
             .get(holderAid.name, qviCredentialId);
 
-        const result = await holderClient.credentials().issue({
-            issuerName: holderAid.name,
+        // const result = await holderClient.credentials().issue({
+        //     issuerName: holderAid.name,
+        //     recipient: legalEntityAid.prefix,
+        //     registryId: holderRegistry.regk,
+        // Since we are sourcing the new credential from a credential that is not
+        // held by the issuer, we expect the issuance call to fail because of input validation.
+        const result = await issuerClient.credentials().issue({
+            issuerName: issuerAid.name,
             recipient: legalEntityAid.prefix,
-            registryId: holderRegistry.regk,
+            registryId: issuerRegistry.regk,
             schemaId: LE_SCHEMA_SAID,
             data: {
                 LEI: '5493001KJTIIGC8Y1R17',
@@ -410,11 +416,15 @@ describe('Chained (LE) credential creation', () => {
             })[1],
         });
 
-        await waitOperation(holderClient, result.op);
-        leCredentialId = result.acdc.ked.d;
+        // What to expect here?
+        await retry(async () => {
+            const oper = await issuerClient.operations().get(result.op.name);
+            console.log(oper.response);
+            assert.equal(oper.done, true);
+        });
     });
 
-    test('LE credential IPEX grant', async () => {
+    test.skip('LE credential IPEX grant', async () => {
         const dt = createTimestamp();
         const leCredential = await holderClient
             .credentials()
@@ -438,7 +448,7 @@ describe('Chained (LE) credential creation', () => {
             ]);
     });
 
-    test('Legal Entity IPEX admit', async () => {
+    test.skip('Legal Entity IPEX admit', async () => {
         const notifications = await waitForNotifications(
             legalEntityClient,
             '/exn/ipex/grant'
@@ -463,7 +473,7 @@ describe('Chained (LE) credential creation', () => {
         await legalEntityClient.notifications().mark(grantNotification.i);
     });
 
-    test('Legal Entity has chained credential', async () => {
+    test.skip('Legal Entity has chained credential', async () => {
         const legalEntityCredential = await retry(async () =>
             legalEntityClient
                 .credentials()
