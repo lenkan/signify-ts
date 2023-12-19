@@ -44,7 +44,7 @@ async function createAid(client: signify.SignifyClient, name: string) {
     return hab;
 }
 
-test('signle signature credentials', async () => {
+test('single signature credentials', async () => {
     const [issuerClient, holderClient, verifierClient] = await Promise.all([
         getOrCreateClient(),
         getOrCreateClient(),
@@ -90,7 +90,7 @@ test('signle signature credentials', async () => {
         ]);
     });
 
-    const registry = await step('Create registry', async () => {
+    const issuerRegistry = await step('Create registry', async () => {
         const registryName = 'vLEI-test-registry';
         const regResult = await issuerClient
             .registries()
@@ -128,7 +128,7 @@ test('signle signature credentials', async () => {
 
         const issResult = await issuerClient.credentials().issue({
             issuerName: issuerAid.name,
-            registryId: registry.regk,
+            registryId: issuerRegistry.regk,
             schemaId: QVI_SCHEMA_SAID,
             recipient: holderAid.prefix,
             data: vcdata,
@@ -348,34 +348,33 @@ test('signle signature credentials', async () => {
         ]);
     });
 
-    const holderRegistry: { regk: string } = await step(
-        'holder create registry for LE credential',
-        async () => {
-            const registryName = 'vLEI-test-registry';
-            const regResult = await holderClient
-                .registries()
-                .create({ name: holderAid.name, registryName: registryName });
+    await step('holder create registry for LE credential', async () => {
+        const registryName = 'vLEI-test-registry';
+        const regResult = await holderClient
+            .registries()
+            .create({ name: holderAid.name, registryName: registryName });
 
-            await waitOperation(holderClient, await regResult.op());
-            const registries = await holderClient
-                .registries()
-                .list(holderAid.name);
-            assert(registries.length >= 1);
-            return registries[0];
-        }
-    );
+        await waitOperation(holderClient, await regResult.op());
+        const registries = await holderClient.registries().list(holderAid.name);
+        assert(registries.length >= 1);
+        return registries[0] as { regk: string };
+    });
 
     const leCredentialId = await step(
-        'holder create LE (chained) credential',
+        'issuer create LE (chained) credential',
         async () => {
-            const qviCredential = await holderClient
+            const qviCredential = await issuerClient
                 .credentials()
-                .get(holderAid.name, qviCredentialId);
+                .get(issuerAid.name, qviCredentialId);
 
-            const result = await holderClient.credentials().issue({
-                issuerName: holderAid.name,
+            const result = await issuerClient.credentials().issue({
+                // issuerName: holderAid.name,
+                // recipient: legalEntityAid.prefix,
+                // registryId: holderRegistry.regk,
+                // schemaId: LE_SCHEMA_SAID,
+                issuerName: issuerAid.name,
                 recipient: legalEntityAid.prefix,
-                registryId: holderRegistry.regk,
+                registryId: issuerRegistry.regk,
                 schemaId: LE_SCHEMA_SAID,
                 data: {
                     LEI: '5493001KJTIIGC8Y1R17',
