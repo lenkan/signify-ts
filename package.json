@@ -11,8 +11,7 @@
   "types": "./dist/index.d.ts",
   "type": "module",
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "scripts": {
     "start": "npm run build:esm -- --watch",
@@ -24,7 +23,7 @@
     "test:integration": "jest examples/integration-scripts/ --runInBand --bail",
     "lint": "npx eslint src test examples/integration-scripts",
     "prepare": "npm run build",
-    "generate-docs": "node_modules/.bin/jsdoc --configure .jsdoc.json --verbose",
+    "generate-docs": "jsdoc --configure .jsdoc.json --verbose",
     "pretty": "prettier --write .",
     "pretty:check": "prettier --check ."
   },
@@ -46,6 +45,7 @@
     "jsdoc": "^4.0.2",
     "minami": "^1.2.3",
     "prettier": "^3.0.3",
+    "semver": "^7.6.0",
     "ts-jest": "^29.1.1",
     "ts-mockito": "^2.6.1",
     "ts-node": "^10.9.1",
