@@ -227,6 +227,8 @@ export class Identifier {
             });
         }
 
+        this.client.manager?.cache.set(serder.ked.i!, keeper);
+
         const sigs = await keeper!.sign(b(serder.raw));
         const jsondata: any = {
             name: name,

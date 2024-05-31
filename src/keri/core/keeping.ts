@@ -72,6 +72,7 @@ export interface Keeper<T extends KeeperParams = KeeperParams> {
 
 export class KeyManager {
     private modules: Record<string, ExternalModuleType> = {};
+    public cache = new Map<string, Keeper>();
 
     constructor(
         private salter: Salter,
@@ -86,8 +87,8 @@ export class KeyManager {
 
     new(algo: Algos, pidx: number, kargs: any) {
         switch (algo) {
-            case Algos.salty:
-                return new SaltyKeeper(
+            case Algos.salty: {
+                const keeper = new SaltyKeeper(
                     this.salter!,
                     pidx,
                     kargs['kidx'],
@@ -104,6 +105,8 @@ export class KeyManager {
                     kargs['bran'],
                     kargs['sxlt']
                 );
+                return keeper;
+            }
             case Algos.randy:
                 return new RandyKeeper(
                     this.salter!,
@@ -143,62 +146,82 @@ export class KeyManager {
     }
 
     get(aid: HabState): Keeper {
-        if (aid[Algos.salty]) {
-            const kargs = aid[Algos.salty];
-            return new SaltyKeeper(
-                this.salter,
-                kargs['pidx'],
-                kargs['kidx'],
-                kargs['tier'],
-                kargs['transferable'],
-                kargs['stem'],
-                undefined,
-                undefined,
-                kargs['icodes'],
-                undefined,
-                undefined,
-                kargs['ncodes'],
-                kargs['dcode'],
-                undefined,
-                kargs['sxlt']
-            );
-        } else if (aid[Algos.randy]) {
-            const pre = new Prefixer({ qb64: aid['prefix'] });
-            const kargs = aid[Algos.randy]!;
-            return new RandyKeeper(
-                this.salter,
-                undefined,
-                undefined,
-                undefined,
-                pre.transferable,
-                undefined,
-                undefined,
-                [],
-                undefined,
-                kargs['prxs'],
-                kargs['nxts']
-            );
-        } else if (aid[Algos.group]) {
-            const kargs = aid[Algos.group];
-            return new GroupKeeper(
-                this,
-                kargs['mhab'],
-                undefined,
-                undefined,
-                kargs['keys'],
-                kargs['ndigs']
-            );
-        } else if (aid[Algos.extern]) {
-            const kargs = aid[Algos.extern];
-            const typ = kargs.extern_type;
-            if (typ in this.modules) {
-                const mod = new this.modules[typ](kargs['pidx'], kargs);
-                return mod;
-            } else {
-                throw new Error(`unsupported external module type ${typ}`);
+        const now = Date.now();
+
+        try {
+            const current = this.cache.get(aid.prefix);
+            if (current) {
+                return current;
             }
-        } else {
-            throw new Error(`Algo not allowed yet`);
+            if (aid[Algos.salty]) {
+                const kargs = aid[Algos.salty];
+                const keeper = new SaltyKeeper(
+                    this.salter,
+                    kargs['pidx'],
+                    kargs['kidx'],
+                    kargs['tier'],
+                    kargs['transferable'],
+                    kargs['stem'],
+                    undefined,
+                    undefined,
+                    kargs['icodes'],
+                    undefined,
+                    undefined,
+                    kargs['ncodes'],
+                    kargs['dcode'],
+                    undefined,
+                    kargs['sxlt']
+                );
+                this.cache.set(aid.prefix, keeper);
+                return keeper;
+            } else if (aid[Algos.randy]) {
+                const pre = new Prefixer({ qb64: aid['prefix'] });
+                const kargs = aid[Algos.randy]!;
+                const keeper = new RandyKeeper(
+                    this.salter,
+                    undefined,
+                    undefined,
+                    undefined,
+                    pre.transferable,
+                    undefined,
+                    undefined,
+                    [],
+                    undefined,
+                    kargs['prxs'],
+                    kargs['nxts']
+                );
+                this.cache.set(aid.prefix, keeper);
+                return keeper;
+            } else if (aid[Algos.group]) {
+                const kargs = aid[Algos.group];
+                const keeper = new GroupKeeper(
+                    this,
+                    kargs['mhab'],
+                    undefined,
+                    undefined,
+                    kargs['keys'],
+                    kargs['ndigs']
+                );
+                this.cache.set(aid.prefix, keeper);
+                return keeper;
+            } else if (aid[Algos.extern]) {
+                const kargs = aid[Algos.extern];
+                const typ = kargs.extern_type;
+                if (typ in this.modules) {
+                    const mod = new this.modules[typ](kargs['pidx'], kargs);
+                    return mod;
+                } else {
+                    throw new Error(`unsupported external module type ${typ}`);
+                }
+            } else {
+                throw new Error(`Algo not allowed yet`);
+            }
+        } finally {
+            process.stdout.write(
+                `Finished with manger.get for ${aid.name}(${aid.prefix}) took ${
+                    Date.now() - now
+                }ms\n`
+            );
         }
     }
 }

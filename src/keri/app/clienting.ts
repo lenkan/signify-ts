@@ -1,6 +1,6 @@
 import { Authenticater } from '../core/authing';
 import { HEADER_SIG_TIME } from '../core/httping';
-import { ExternalModule, KeyManager } from '../core/keeping';
+import { ExternalModule, Keeper, KeyManager } from '../core/keeping';
 import { Tier } from '../core/salter';
 
 import { Identifier } from './aiding';
@@ -41,6 +41,7 @@ export class SignifyClient {
     public tier: Tier;
     public bootUrl: string;
     public exteralModules: ExternalModule[];
+    public keepers = new Map<string, Keeper>();
 
     /**
      * SignifyClient constructor
