@@ -1,4 +1,16 @@
-import { Algos, Siger, SignifyClient, d, messagize } from 'signify-ts';
+import {
+    Algos,
+    HabState,
+    Operation,
+    Siger,
+    SignifyClient,
+    d,
+    messagize,
+} from 'signify-ts';
+
+export function createTimestamp() {
+    return new Date().toISOString().replace('Z', '000+00:00');
+}
 
 export interface AcceptMultisigInceptArgs {
     groupName: string;
@@ -124,4 +136,75 @@ async function getStates(client: SignifyClient, prefixes: string[]) {
         prefixes.map((p) => client.keyStates().get(p))
     );
     return participantStates.map((s) => s[0]);
+}
+
+export interface AddEndRoleArgs {
+    alias: string;
+    eid: string;
+    role: string;
+    dt?: string;
+}
+
+function createSeal(hab: HabState) {
+    const habStateEvent = hab.state?.ee as { s: string; d: string };
+    const seal = [
+        'SealEvent',
+        {
+            i: hab['prefix'],
+            s: habStateEvent['s'],
+            d: habStateEvent['d'],
+        },
+    ];
+
+    return seal;
+}
+
+async function findRecipients(client: SignifyClient, hab: HabState) {
+    if (!hab.group) {
+        throw new Error(`Hab ${hab.name} is not a group`);
+    }
+    const mhab = hab.group.mhab;
+    const members = await client.identifiers().members(hab.name);
+    return members.signing
+        .map((m: { aid: string }) => m.aid)
+        .filter((aid: string) => aid !== mhab.prefix);
+}
+
+export async function addEndRole(
+    client: SignifyClient,
+    args: AddEndRoleArgs
+): Promise<Operation> {
+    const hab = await client.identifiers().get(args.alias);
+    const dt = args.dt ?? createTimestamp();
+    const result = await client
+        .identifiers()
+        .addEndRole(hab.name, args.role, args.eid, dt);
+
+    const operation = await result.op();
+
+    if (hab.group) {
+        const seal = createSeal(hab);
+        const sigers = result.sigs.map(
+            (sig: string) => new Siger({ qb64: sig })
+        );
+        const roleims = d(
+            messagize(result.serder, sigers, seal, undefined, undefined, false)
+        );
+        const atc = roleims.substring(result.serder.size);
+        const recipient = await findRecipients(client, hab);
+
+        await client.exchanges().send(
+            hab.group.mhab.name,
+            'multisig',
+            hab.group.mhab,
+            '/multisig/rpy',
+            { gid: hab.prefix },
+            {
+                rpy: [result.serder, atc],
+            },
+            recipient
+        );
+    }
+
+    return operation;
 }

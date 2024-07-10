@@ -7,10 +7,13 @@ import {
 import { getOrCreateClient, getOrCreateIdentifier } from './utils/test-setup';
 import {
     acceptMultisigIncept,
+    addEndRole,
+    createTimestamp,
     startMultisigIncept,
 } from './utils/multisig-utils';
 import assert from 'assert';
 import { step } from './utils/test-step';
+import { execSync } from 'child_process';
 
 test('multisig inception', async () => {
     await signify.ready();
@@ -87,6 +90,44 @@ test('multisig inception', async () => {
         assert.strictEqual(members.signing[1].aid, aid2);
         assert.strictEqual(members.rotation[0].aid, aid1);
         assert.strictEqual(members.rotation[1].aid, aid2);
+    });
+
+    await step('Create agent end role', async () => {
+        const dt = createTimestamp();
+        const operation1 = await addEndRole(client1, {
+            alias: 'multisig',
+            eid: client1.agent!.pre,
+            role: 'agent',
+            dt,
+        });
+
+        const operation2 = await addEndRole(client2, {
+            alias: 'multisig',
+            eid: client1.agent!.pre,
+            role: 'agent',
+            dt,
+        });
+
+        await Promise.all([
+            client1
+                .operations()
+                .wait(operation1, { signal: AbortSignal.timeout(10000) }),
+            client2
+                .operations()
+                .wait(operation2, { signal: AbortSignal.timeout(10000) }),
+        ]);
+
+        execSync('docker compose up --force-recreate deps', {
+            cwd: process.cwd(),
+            stdio: 'inherit',
+        });
+
+        await addEndRole(client1, {
+            alias: 'multisig',
+            eid: client1.agent!.pre,
+            role: 'agent',
+            dt,
+        });
     });
 
     await step('Test creating another group', async () => {
