@@ -12,8 +12,11 @@ import {
 import { getOrCreateClient, getOrCreateIdentifier } from './utils/test-setup';
 import {
     acceptMultisigIncept,
+    addEndRole,
+    createTimestamp,
     startMultisigIncept,
 } from './utils/multisig-utils';
+import { step } from './utils/test-step';
 
 test('delegation-multisig', async () => {
     await signify.ready();
@@ -107,6 +110,46 @@ test('delegation-multisig', async () => {
 
     await assertOperations(client0, client1, client2);
     await assertNotifications(client0, client1, client2);
+
+    await step('Create agent end role', async () => {
+        const dt = createTimestamp();
+        const operation1 = await addEndRole(client1, {
+            alias: 'multisig',
+            eid: client1.agent!.pre,
+            role: 'agent',
+            dt,
+        });
+
+        const operation2 = await addEndRole(client2, {
+            alias: 'multisig',
+            eid: client1.agent!.pre,
+            role: 'agent',
+            dt,
+        });
+
+        await Promise.all([
+            client1
+                .operations()
+                .wait(operation1, { signal: AbortSignal.timeout(10000) }),
+            client2
+                .operations()
+                .wait(operation2, { signal: AbortSignal.timeout(10000) }),
+        ]);
+
+        // execSync('docker compose up --force-recreate deps', {
+        //     cwd: process.cwd(),
+        //     stdio: 'inherit',
+        // });
+
+        const op3 = await addEndRole(client1, {
+            alias: 'multisig',
+            eid: client1.agent!.pre,
+            role: 'agent',
+            dt,
+        });
+
+        console.log('Added again', op3);
+    });
 }, 30000);
 
 async function createAID(client: signify.SignifyClient, name: string) {
