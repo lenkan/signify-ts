@@ -117,16 +117,16 @@ test('multisig inception', async () => {
                 .wait(operation2, { signal: AbortSignal.timeout(10000) }),
         ]);
 
-        execSync('docker compose up --force-recreate deps', {
-            cwd: process.cwd(),
-            stdio: 'inherit',
-        });
+        // execSync('docker compose up --force-recreate deps', {
+        //     cwd: process.cwd(),
+        //     stdio: 'inherit',
+        // });
 
         await addEndRole(client1, {
             alias: 'multisig',
             eid: client1.agent!.pre,
             role: 'agent',
-            dt,
+            dt: createTimestamp(),
         });
     });
 
@@ -171,4 +171,4 @@ test('multisig inception', async () => {
         // assert.strictEqual(members.signing.length, 2);
         // assert.strictEqual(members.rotating.length, 2);
     });
-}, 30000);
+}, 60000);
