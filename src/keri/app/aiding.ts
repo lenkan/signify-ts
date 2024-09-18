@@ -2,12 +2,10 @@ import { Tier } from '../core/salter';
 import { Algos } from '../core/manager';
 import { incept, interact, reply, rotate } from '../core/eventing';
 import { b, Ilks, Serials, Versionage } from '../core/core';
-import { Tholder } from '../core/tholder';
 import { MtrDex } from '../core/matter';
 import { Serder } from '../core/serder';
 import { parseRangeHeaders } from '../core/httping';
 import { KeyManager } from '../core/keeping';
-import { Operation } from './coring';
 import { HabState } from '../core/state';
 
 /** Arguments required to create an identfier */
@@ -335,8 +333,8 @@ export class Identifier {
         if (nsith == undefined)
             nsith = `${Math.max(1, Math.ceil(ncount / 2)).toString(16)}`;
 
-        const cst = new Tholder({ sith: isith }).sith; // current signing threshold
-        const nst = new Tholder({ sith: nsith }).sith; // next signing threshold
+        const cst = isith;
+        const nst = nsith;
 
         // Regenerate next keys to sign rotation event
         const keeper = this.client.manager!.get(hab);
