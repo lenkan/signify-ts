@@ -119,11 +119,11 @@ export class Sizage {
 }
 
 export interface MatterArgs {
-    raw?: Uint8Array | undefined;
+    raw?: Uint8Array;
     code?: string;
-    qb64b?: Uint8Array | undefined;
+    qb64b?: Uint8Array;
     qb64?: string;
-    qb2?: Uint8Array | undefined;
+    qb2?: Uint8Array;
     rize?: number;
 }
 

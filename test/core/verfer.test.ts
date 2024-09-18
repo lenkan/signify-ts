@@ -13,9 +13,12 @@ function base64ToUint8Array(base64: string) {
     return new Uint8Array(bytes.buffer);
 }
 
+beforeAll(async () => {
+    await libsodium.ready;
+});
+
 describe('Verfer', () => {
     it('should verify digests', async () => {
-        await libsodium.ready;
         const seed = libsodium.randombytes_buf(libsodium.crypto_sign_SEEDBYTES);
         const keypair = libsodium.crypto_sign_seed_keypair(seed);
 
