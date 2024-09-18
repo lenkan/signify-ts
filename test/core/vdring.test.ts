@@ -2,9 +2,12 @@ import libsodium from 'libsodium-wrappers-sumo';
 import { vdr } from '../../src/keri/core/vdring';
 import { strict as assert } from 'assert';
 
+beforeAll(async () => {
+    await libsodium.ready;
+});
+
 describe('vdr', () => {
     it('should create registry inception events ', async () => {
-        await libsodium.ready;
         let actual = vdr.incept({
             pre: 'ECJIoBpEcCWMzvquk861dXP8JJZ-vbmJczlDR-NYcE3g',
             toad: 0,
@@ -29,7 +32,6 @@ describe('vdr', () => {
     });
 
     it('should fail on NB config with backers', async () => {
-        await libsodium.ready;
         const cnfg = ['NB'];
         assert.throws(
             () => {
@@ -49,7 +51,6 @@ describe('vdr', () => {
     });
 
     it('should fail with duplicate backers', async () => {
-        await libsodium.ready;
         assert.throws(
             () => {
                 vdr.incept({
@@ -67,7 +68,6 @@ describe('vdr', () => {
     });
 
     it('should fail with invalid toad config for backers', async () => {
-        await libsodium.ready;
         assert.throws(
             () => {
                 vdr.incept({
@@ -85,7 +85,6 @@ describe('vdr', () => {
     });
 
     it('should fail with invalid toad for no backers', async () => {
-        await libsodium.ready;
         assert.throws(
             () => {
                 vdr.incept({
@@ -102,7 +101,6 @@ describe('vdr', () => {
     });
 
     it('should allow optional toad and no backers', async () => {
-        await libsodium.ready;
         const actual = vdr.incept({
             pre: 'ECJIoBpEcCWMzvquk861dXP8JJZ-vbmJczlDR-NYcE3g',
             nonce: 'AHSNDV3ABI6U8OIgKaj3aky91ZpNL54I5_7-qwtC6q2s',
@@ -121,7 +119,6 @@ describe('vdr', () => {
     });
 
     it('should allow optional toad and backers', async () => {
-        await libsodium.ready;
         const actual = vdr.incept({
             pre: 'ECJIoBpEcCWMzvquk861dXP8JJZ-vbmJczlDR-NYcE3g',
             nonce: 'AHSNDV3ABI6U8OIgKaj3aky91ZpNL54I5_7-qwtC6q2s',
