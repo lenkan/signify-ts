@@ -1,6 +1,4 @@
 import { EmptyMaterialError } from './kering';
-
-export {};
 import libsodium from 'libsodium-wrappers-sumo';
 import { Matter } from './matter';
 import { MtrDex } from './matter';
@@ -27,8 +25,17 @@ interface SignerArgs {
     transferable?: boolean;
 }
 
+type SignFunction = (
+    ser: Uint8Array,
+    seed: Uint8Array,
+    verfer: Verfer,
+    index: number | null,
+    only?: boolean,
+    ondex?: number | undefined
+) => Siger | Cigar;
+
 export class Signer extends Matter {
-    private readonly _sign: Function;
+    private readonly _sign: SignFunction;
     private readonly _verfer: Verfer;
 
     constructor({
