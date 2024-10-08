@@ -122,6 +122,12 @@ export class Bexter extends Matter {
 
     get bext(): string {
         const sizage = Matter.Sizes.get(this.code);
+        if (!sizage) {
+            throw new Error(
+                `Could not determine sizage for code '${this.code}'`
+            );
+        }
+
         const wad = Uint8Array.from(new Array(sizage?.ls).fill(0));
         const bext = encodeBase64Url(Buffer.from([...wad, ...this.raw]));
 
@@ -131,7 +137,7 @@ export class Bexter extends Matter {
                 ws = 1;
             }
         } else {
-            ws = (sizage?.ls! + 1) % 4;
+            ws = (sizage.ls! + 1) % 4;
         }
 
         return bext.substring(ws);
