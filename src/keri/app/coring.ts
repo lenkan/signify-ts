@@ -2,6 +2,7 @@ import { SignifyClient } from './clienting.ts';
 import libsodium from 'libsodium-wrappers-sumo';
 import { Salter } from '../core/salter.ts';
 import { Matter, MtrDex } from '../core/matter.ts';
+import { Connection } from './connecting.ts';
 
 export function randomPasscode(): string {
     const raw = libsodium.randombytes_buf(16);
@@ -18,12 +19,13 @@ export function randomNonce(): string {
 }
 
 export class Oobis {
-    public client: SignifyClient;
+    public client: Connection;
+
     /**
      * Oobis
-     * @param {SignifyClient} client
+     * @param client Connection to a KERIA agent
      */
-    constructor(client: SignifyClient) {
+    constructor(client: Connection) {
         this.client = client;
     }
 

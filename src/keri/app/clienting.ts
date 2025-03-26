@@ -2,8 +2,9 @@ import { Authenticater } from '../core/authing.ts';
 import { HEADER_SIG_TIME } from '../core/httping.ts';
 import { ExternalModule, IdentifierManagerFactory } from '../core/keeping.ts';
 import { Tier } from '../core/salter.ts';
-
+import { KeriaAdminClient } from './administrating.ts';
 import { Identifier } from './aiding.ts';
+import { Connection, State } from './connecting.ts';
 import { Contacts, Challenges } from './contacting.ts';
 import { Agent, Controller } from './controller.ts';
 import { Oobis, Operations, KeyEvents, KeyStates, Config } from './coring.ts';
@@ -16,35 +17,46 @@ import { Notifications } from './notifying.ts';
 
 const DEFAULT_BOOT_URL = 'http://localhost:3903';
 
-class State {
-    agent: any | null;
-    controller: any | null;
-    ridx: number;
-    pidx: number;
-
-    constructor() {
-        this.agent = null;
-        this.controller = null;
-        this.pidx = 0;
-        this.ridx = 0;
-    }
-}
-
 /**
  * An in-memory key manager that can connect to a KERIA Agent and use it to
  * receive messages and act as a proxy for multi-signature operations and delegation operations.
  */
 export class SignifyClient {
-    public controller: Controller;
-    public url: string;
     public bran: string;
-    public pidx: number;
-    public agent: Agent | null;
-    public authn: Authenticater | null;
-    public manager: IdentifierManagerFactory | null;
-    public tier: Tier;
-    public bootUrl: string;
-    public exteralModules: ExternalModule[];
+    public readonly connection: Connection;
+    public readonly admin: KeriaAdminClient;
+
+    public get url(): string {
+        return this.connection.url;
+    }
+
+    public get bootUrl(): string {
+        return this.admin.url;
+    }
+
+    public get controller(): Controller {
+        return this.connection.controller;
+    }
+
+    public get pidx(): number {
+        return this.connection.pidx;
+    }
+
+    public get tier(): Tier {
+        return this.controller.tier;
+    }
+
+    public get authn(): Authenticater | null {
+        return this.connection.authn;
+    }
+
+    public get agent(): Agent | null {
+        return this.connection.agent;
+    }
+
+    public get manager(): IdentifierManagerFactory | null {
+        return this.connection.manager;
+    }
 
     /**
      * SignifyClient constructor
@@ -61,19 +73,23 @@ export class SignifyClient {
         bootUrl: string = DEFAULT_BOOT_URL,
         externalModules: ExternalModule[] = []
     ) {
-        this.url = url;
         if (bran.length < 21) {
             throw Error('bran must be 21 characters');
         }
         this.bran = bran;
-        this.pidx = 0;
-        this.controller = new Controller(bran, tier);
-        this.authn = null;
-        this.agent = null;
-        this.manager = null;
-        this.tier = tier;
-        this.bootUrl = bootUrl;
-        this.exteralModules = externalModules;
+
+        const controller = new Controller(bran, tier);
+        const manager = new IdentifierManagerFactory(
+            controller.salter,
+            externalModules
+        );
+
+        this.connection = new Connection({
+            controller,
+            manager,
+            url,
+        });
+        this.admin = new KeriaAdminClient(bootUrl);
     }
 
     get data() {
@@ -86,22 +102,7 @@ export class SignifyClient {
      * @returns {Promise<Response>} A promise to the result of the boot
      */
     async boot(): Promise<Response> {
-        const [evt, sign] = this.controller?.event ?? [];
-        const data = {
-            icp: evt.sad,
-            sig: sign.qb64,
-            stem: this.controller?.stem,
-            pidx: 1,
-            tier: this.controller?.tier,
-        };
-
-        return await fetch(this.bootUrl + '/boot', {
-            method: 'POST',
-            body: JSON.stringify(data),
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
+        return await this.admin.boot(this.controller);
     }
 
     /**
@@ -110,54 +111,14 @@ export class SignifyClient {
      * @returns {Promise<Response>} A promise to the state
      */
     async state(): Promise<State> {
-        const caid = this.controller?.pre;
-
-        const res = await fetch(this.url + `/agent/${caid}`);
-        if (res.status == 404) {
-            throw new Error(`agent does not exist for controller ${caid}`);
-        }
-
-        const data = await res.json();
-        const state = new State();
-        state.agent = data.agent ?? {};
-        state.controller = data.controller ?? {};
-        state.ridx = data.ridx ?? 0;
-        state.pidx = data.pidx ?? 0;
-        return state;
+        return await this.connection.state();
     }
 
     /**  Connect to a KERIA agent
      * @async
      */
     async connect() {
-        const state = await this.state();
-        this.pidx = state.pidx;
-        //Create controller representing the local client AID
-        this.controller = new Controller(
-            this.bran,
-            this.tier,
-            0,
-            state.controller
-        );
-        this.controller.ridx = state.ridx !== undefined ? state.ridx : 0;
-        // Create agent representing the AID of KERIA cloud agent
-        this.agent = new Agent(state.agent);
-        if (this.agent.anchor != this.controller.pre) {
-            throw Error(
-                'commitment to controller AID missing in agent inception event'
-            );
-        }
-        if (this.controller.serder.sad.s == 0) {
-            await this.approveDelegation();
-        }
-        this.manager = new IdentifierManagerFactory(
-            this.controller.salter,
-            this.exteralModules
-        );
-        this.authn = new Authenticater(
-            this.controller.signer,
-            this.agent.verfer!
-        );
+        await this.connection.connect();
     }
 
     /**
@@ -175,63 +136,7 @@ export class SignifyClient {
         data: any,
         extraHeaders?: Headers
     ): Promise<Response> {
-        const headers = new Headers();
-        let signed_headers = new Headers();
-        const final_headers = new Headers();
-
-        headers.set('Signify-Resource', this.controller.pre);
-        headers.set(
-            HEADER_SIG_TIME,
-            new Date().toISOString().replace('Z', '000+00:00')
-        );
-        headers.set('Content-Type', 'application/json');
-
-        const _body = method == 'GET' ? null : JSON.stringify(data);
-
-        if (this.authn) {
-            signed_headers = this.authn.sign(
-                headers,
-                method,
-                path.split('?')[0]
-            );
-        } else {
-            throw new Error('client need to call connect first');
-        }
-
-        signed_headers.forEach((value, key) => {
-            final_headers.set(key, value);
-        });
-        if (extraHeaders !== undefined) {
-            extraHeaders.forEach((value, key) => {
-                final_headers.append(key, value);
-            });
-        }
-        const res = await fetch(this.url + path, {
-            method: method,
-            body: _body,
-            headers: final_headers,
-        });
-        if (!res.ok) {
-            const error = await res.text();
-            const message = `HTTP ${method} ${path} - ${res.status} ${res.statusText} - ${error}`;
-            throw new Error(message);
-        }
-        const isSameAgent =
-            this.agent?.pre === res.headers.get('signify-resource');
-        if (!isSameAgent) {
-            throw new Error('message from a different remote agent');
-        }
-
-        const verification = this.authn.verify(
-            res.headers,
-            method,
-            path.split('?')[0]
-        );
-        if (verification) {
-            return res;
-        } else {
-            throw new Error('response verification failed');
-        }
+        return await this.connection.fetch(path, method, data, extraHeaders);
     }
 
     /**
@@ -276,31 +181,6 @@ export class SignifyClient {
         req.headers = signed_headers;
 
         return new Request(url, req);
-    }
-
-    /**
-     * Approve the delegation of the client AID to the KERIA agent
-     * @async
-     * @returns {Promise<Response>} A promise to the result of the approval
-     */
-    async approveDelegation(): Promise<Response> {
-        const sigs = this.controller.approveDelegation(this.agent!);
-
-        const data = {
-            ixn: this.controller.serder.sad,
-            sigs: sigs,
-        };
-
-        return await fetch(
-            this.url + '/agent/' + this.controller.pre + '?type=ixn',
-            {
-                method: 'PUT',
-                body: JSON.stringify(data),
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
     }
 
     /**
@@ -359,7 +239,7 @@ export class SignifyClient {
      * @returns {Identifier}
      */
     identifiers(): Identifier {
-        return new Identifier(this);
+        return new Identifier(this.connection);
     }
 
     /**
@@ -367,7 +247,7 @@ export class SignifyClient {
      * @returns {Oobis}
      */
     oobis(): Oobis {
-        return new Oobis(this);
+        return new Oobis(this.connection);
     }
 
     /**

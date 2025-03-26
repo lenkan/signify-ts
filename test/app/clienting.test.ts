@@ -106,9 +106,8 @@ describe('SignifyClient', () => {
         );
         assert.equal(client.controller.serder.sad.a[0].s, '0');
 
-        const data = client.data;
-        assert(data[0], url);
-        assert(data[0], bran);
+        assert.equal(client.url, url);
+        assert.equal(client.bran, bran);
 
         assert.equal(client.identifiers() instanceof Identifier, true);
         assert.equal(client.operations() instanceof Operations, true);

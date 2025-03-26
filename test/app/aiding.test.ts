@@ -9,29 +9,21 @@ import { randomUUID } from 'node:crypto';
 import {
     Controller,
     Identifier,
-    IdentifierDeps,
-    IdentifierManagerFactory,
     Tier,
     randomPasscode,
 } from '../../src/index.ts';
 import { createMockIdentifierState } from './test-utils.ts';
+import { Connection } from '../../src/keri/app/connecting.ts';
 
 const bran = '0123456789abcdefghijk';
 
-export class MockClient implements IdentifierDeps {
-    manager: IdentifierManagerFactory;
-    controller: Controller;
+export class MockConnection extends Connection {
     pidx = 0;
 
     fetch = vitest.fn();
 
     constructor(bran: string) {
-        this.controller = new Controller(bran, Tier.low);
-        this.manager = new IdentifierManagerFactory(this.controller.salter);
-    }
-
-    identifiers() {
-        return new Identifier(this);
+        super({ url: '', controller: new Controller(bran, Tier.low) });
     }
 
     getLastMockRequest() {
@@ -45,28 +37,31 @@ export class MockClient implements IdentifierDeps {
     }
 }
 
-let client: MockClient;
+let identifiers: Identifier;
+let connection: MockConnection;
+
 beforeEach(async () => {
     await libsodium.ready;
-    client = new MockClient(bran);
+    connection = new MockConnection(bran);
+    identifiers = new Identifier(connection);
 });
 
 describe('Aiding', () => {
     it('Can list identifiers', async () => {
-        client.fetch.mockResolvedValue(Response.json({}));
-        await client.identifiers().list();
-        const lastCall = client.getLastMockRequest();
+        connection.fetch.mockResolvedValue(Response.json({}));
+        await identifiers.list();
+        const lastCall = connection.getLastMockRequest();
         assert.equal(lastCall.path, '/identifiers');
         assert.equal(lastCall.method, 'GET');
     });
 
     it('Can create salty identifiers', async () => {
-        client.fetch.mockResolvedValue(Response.json({}));
-        await client
-            .identifiers()
-            .create('aid1', { bran: '0123456789abcdefghijk' });
+        connection.fetch.mockResolvedValue(Response.json({}));
+        await identifiers.create('aid1', {
+            bran: '0123456789abcdefghijk',
+        });
 
-        const lastCall = client.getLastMockRequest();
+        const lastCall = connection.getLastMockRequest();
         assert.equal(lastCall.path, '/identifiers');
         assert.equal(lastCall.method, 'POST');
         assert.equal(lastCall.body.name, 'aid1');
@@ -99,13 +94,13 @@ describe('Aiding', () => {
     });
 
     it('Can create non-transferable salty identifiers', async () => {
-        client.fetch.mockResolvedValue(Response.json({}));
-        await client.identifiers().create('aid1', {
+        connection.fetch.mockResolvedValue(Response.json({}));
+        await identifiers.create('aid1', {
             bran: '0123456789abcdefghijk',
             transferable: false,
         });
 
-        const lastCall = client.getLastMockRequest();
+        const lastCall = connection.getLastMockRequest();
         assert.equal(lastCall.path, '/identifiers');
         assert.equal(lastCall.method, 'POST');
         assert.equal(lastCall.body.name, 'aid1');
@@ -137,18 +132,18 @@ describe('Aiding', () => {
     });
 
     it('Can get identifiers with special characters in the name', async () => {
-        client.fetch.mockResolvedValue(Response.json({}));
-        await client.identifiers().get('a name with ñ!');
+        connection.fetch.mockResolvedValue(Response.json({}));
+        await identifiers.get('a name with ñ!');
 
-        const lastCall = client.getLastMockRequest();
+        const lastCall = connection.getLastMockRequest();
         assert.equal(lastCall.method, 'GET');
         assert.equal(lastCall.path, '/identifiers/a%20name%20with%20%C3%B1!');
     });
 
     it('Can create salty AID with multiple signatures', async () => {
-        client.fetch.mockResolvedValue(Response.json({}));
+        connection.fetch.mockResolvedValue(Response.json({}));
 
-        const result = await client.identifiers().create('aid2', {
+        const result = await identifiers.create('aid2', {
             count: 3,
             ncount: 3,
             isith: '2',
@@ -157,7 +152,7 @@ describe('Aiding', () => {
         });
 
         await result.op();
-        const lastCall = client.getLastMockRequest();
+        const lastCall = connection.getLastMockRequest();
         assert.equal(lastCall.path, '/identifiers');
         assert.equal(lastCall.method, 'POST');
         assert.equal(lastCall.body.name, 'aid2');
@@ -201,21 +196,19 @@ describe('Aiding', () => {
 
     it('Should throw error if fetch call fails when creating identifier', async () => {
         const error = new Error(`Fail ${randomUUID()}`);
-        client.fetch.mockRejectedValue(error);
+        connection.fetch.mockRejectedValue(error);
         await expect(
-            client
-                .identifiers()
-                .create('aid1', { bran: '0123456789abcdefghijk' })
+            identifiers.create('aid1', { bran: '0123456789abcdefghijk' })
         ).rejects.toThrow(error);
     });
 
     it('Can rotate salty identifier', async () => {
         const aid1 = await createMockIdentifierState('aid1', bran, {});
-        client.fetch.mockResolvedValueOnce(Response.json(aid1));
-        client.fetch.mockResolvedValueOnce(Response.json({}));
+        connection.fetch.mockResolvedValueOnce(Response.json(aid1));
+        connection.fetch.mockResolvedValueOnce(Response.json({}));
 
-        await client.identifiers().rotate('aid1');
-        const lastCall = client.getLastMockRequest();
+        await identifiers.rotate('aid1');
+        const lastCall = connection.getLastMockRequest();
         assert.equal(lastCall.path, '/identifiers/aid1/events');
         assert.equal(lastCall.method, 'POST');
         assert.deepEqual(lastCall.body.rot, {
@@ -249,7 +242,7 @@ describe('Aiding', () => {
 
     it('Can rotate salty identifier with sn > 10', async () => {
         const aid1 = await createMockIdentifierState('aid1', bran, {});
-        client.fetch.mockResolvedValueOnce(
+        connection.fetch.mockResolvedValueOnce(
             Response.json({
                 ...aid1,
                 state: {
@@ -258,10 +251,10 @@ describe('Aiding', () => {
                 },
             })
         );
-        client.fetch.mockResolvedValueOnce(Response.json({}));
+        connection.fetch.mockResolvedValueOnce(Response.json({}));
 
-        await client.identifiers().rotate('aid1');
-        const lastCall = client.getLastMockRequest();
+        await identifiers.rotate('aid1');
+        const lastCall = connection.getLastMockRequest();
         assert.equal(lastCall.path, '/identifiers/aid1/events');
         assert.equal(lastCall.method, 'POST');
         expect(lastCall.body.rot).toMatchObject({
@@ -281,12 +274,12 @@ describe('Aiding', () => {
         ];
 
         const aid1 = await createMockIdentifierState('aid1', bran);
-        client.fetch.mockResolvedValueOnce(Response.json(aid1));
-        client.fetch.mockResolvedValueOnce(Response.json({}));
+        connection.fetch.mockResolvedValueOnce(Response.json(aid1));
+        connection.fetch.mockResolvedValueOnce(Response.json({}));
 
-        await client.identifiers().interact('aid1', data);
+        await identifiers.interact('aid1', data);
 
-        const lastCall = client.getLastMockRequest();
+        const lastCall = connection.getLastMockRequest();
 
         assert.equal(lastCall.path, '/identifiers/aid1/events');
         assert.equal(lastCall.method, 'POST');
@@ -315,7 +308,7 @@ describe('Aiding', () => {
         ];
 
         const aid1 = await createMockIdentifierState('aid1', bran);
-        client.fetch.mockResolvedValueOnce(
+        connection.fetch.mockResolvedValueOnce(
             Response.json({
                 ...aid1,
                 state: {
@@ -324,11 +317,11 @@ describe('Aiding', () => {
                 },
             })
         );
-        client.fetch.mockResolvedValueOnce(Response.json({}));
+        connection.fetch.mockResolvedValueOnce(Response.json({}));
 
-        await client.identifiers().interact('aid1', data);
+        await identifiers.interact('aid1', data);
 
-        const lastCall = client.getLastMockRequest();
+        const lastCall = connection.getLastMockRequest();
 
         assert.equal(lastCall.path, '/identifiers/aid1/events');
         assert.equal(lastCall.method, 'POST');
@@ -340,11 +333,11 @@ describe('Aiding', () => {
 
     it('Can add end role', async () => {
         const aid1 = await createMockIdentifierState('aid1', bran, {});
-        client.fetch.mockResolvedValueOnce(Response.json(aid1));
-        client.fetch.mockResolvedValueOnce(Response.json({}));
+        connection.fetch.mockResolvedValueOnce(Response.json(aid1));
+        connection.fetch.mockResolvedValueOnce(Response.json({}));
 
-        await client.identifiers().addEndRole('aid1', 'agent');
-        const lastCall = client.getLastMockRequest();
+        await identifiers.addEndRole('aid1', 'agent');
+        const lastCall = connection.getLastMockRequest();
         assert.equal(lastCall.path, '/identifiers/aid1/endroles');
         assert.equal(lastCall.method, 'POST');
         assert.equal(lastCall.body.rpy.t, 'rpy');
@@ -357,27 +350,27 @@ describe('Aiding', () => {
 
     it('Should throw error if fetch call fails when adding end role', async () => {
         const error = new Error(`Fail ${randomUUID()}`);
-        client.fetch.mockRejectedValue(error);
-        await expect(
-            client.identifiers().addEndRole('aid1', 'agent')
-        ).rejects.toThrow(error);
+        connection.fetch.mockRejectedValue(error);
+        await expect(identifiers.addEndRole('aid1', 'agent')).rejects.toThrow(
+            error
+        );
     });
 
     it('Can get members', async () => {
-        client.fetch.mockResolvedValue(Response.json({}));
-        await client.identifiers().members('aid1');
-        const lastCall = client.getLastMockRequest();
+        connection.fetch.mockResolvedValue(Response.json({}));
+        await identifiers.members('aid1');
+        const lastCall = connection.getLastMockRequest();
         assert.equal(lastCall.path, '/identifiers/aid1/members');
         assert.equal(lastCall.method, 'GET');
     });
 
     it('Randy identifiers', async () => {
-        client.fetch.mockResolvedValue(Response.json({}));
-        await client.identifiers().create('aid1', {
+        connection.fetch.mockResolvedValue(Response.json({}));
+        await identifiers.create('aid1', {
             bran: '0123456789abcdefghijk',
             algo: Algos.randy,
         });
-        const lastCall = client.getLastMockRequest();
+        const lastCall = connection.getLastMockRequest();
         assert.equal(lastCall.path, '/identifiers');
         assert.equal(lastCall.method, 'POST');
         assert.equal(lastCall.body.name, 'aid1');
@@ -387,9 +380,9 @@ describe('Aiding', () => {
     });
 
     it('Can rename identifier', async () => {
-        client.fetch.mockResolvedValue(Response.json({}));
-        await client.identifiers().update('aid1', { name: 'aid2' });
-        const lastCall = client.getLastMockRequest();
+        connection.fetch.mockResolvedValue(Response.json({}));
+        await identifiers.update('aid1', { name: 'aid2' });
+        const lastCall = connection.getLastMockRequest();
         assert.equal(lastCall.path, '/identifiers/aid1');
         assert.equal(lastCall.method, 'PUT');
         assert.equal(lastCall.body.name, 'aid2');
@@ -417,10 +410,10 @@ describe('Aiding', () => {
                 rstates: [member1.state, member2.state],
             });
 
-            client.fetch.mockResolvedValueOnce(
+            connection.fetch.mockResolvedValueOnce(
                 Response.json(group, { status: 200 })
             );
-            client.fetch.mockResolvedValueOnce(
+            connection.fetch.mockResolvedValueOnce(
                 Response.json({}, { status: 202 })
             );
 
@@ -430,8 +423,8 @@ describe('Aiding', () => {
                 rstates: [member1.state, member2.state],
             };
 
-            await client.identifiers().rotate(group.name, args);
-            const request = client.getLastMockRequest();
+            await identifiers.rotate(group.name, args);
+            const request = connection.getLastMockRequest();
             const body = request.body;
             expect(body).toMatchObject({
                 rot: {
@@ -457,14 +450,14 @@ describe('Aiding', () => {
                 rstates: [member1.state, member2.state],
             });
 
-            client.fetch.mockResolvedValueOnce(Response.json(group));
-            client.fetch.mockResolvedValueOnce(Response.json({}));
-            await client.identifiers().rotate(group.name, {
+            connection.fetch.mockResolvedValueOnce(Response.json(group));
+            connection.fetch.mockResolvedValueOnce(Response.json({}));
+            await identifiers.rotate(group.name, {
                 nsith: '1',
                 states: [member1.state, member2.state],
                 rstates: [member1.state, member2.state],
             });
-            const request = client.getLastMockRequest();
+            const request = connection.getLastMockRequest();
             expect(request.body.rot).toMatchObject({
                 t: 'rot',
                 kt: nextThreshold,

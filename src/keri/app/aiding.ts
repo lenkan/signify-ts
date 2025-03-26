@@ -6,8 +6,8 @@ import { Tholder } from '../core/tholder.ts';
 import { MtrDex } from '../core/matter.ts';
 import { Serder } from '../core/serder.ts';
 import { parseRangeHeaders } from '../core/httping.ts';
-import { IdentifierManagerFactory } from '../core/keeping.ts';
 import { HabState } from '../core/keyState.ts';
+import { Connection } from './connecting.ts';
 
 /** Arguments required to create an identfier */
 export interface CreateIdentiferArgs {
@@ -53,20 +53,6 @@ export interface RotateIdentifierArgs {
 }
 
 /**
- * Reducing the SignifyClient dependencies used by Identifier class
- */
-export interface IdentifierDeps {
-    fetch(
-        pathname: string,
-        method: string,
-        body: unknown,
-        headers?: Headers
-    ): Promise<Response>;
-    pidx: number;
-    manager: IdentifierManagerFactory | null;
-}
-
-/**
  * Updatable information for a managed identifier
  */
 export interface IdentifierInfo {
@@ -75,13 +61,13 @@ export interface IdentifierInfo {
 
 /** Identifier */
 export class Identifier {
-    public client: IdentifierDeps;
+    public client: Connection;
 
     /**
      * Identifier
-     * @param {IdentifierDeps} client
+     * @param {Connection} client
      */
-    constructor(client: IdentifierDeps) {
+    constructor(client: Connection) {
         this.client = client;
     }
 

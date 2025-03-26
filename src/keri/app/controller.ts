@@ -114,7 +114,7 @@ export class Controller {
      * The salter is a cryptographic salt used to derive the controller's cryptographic key pairs
      * and is deterministically derived from the bran and the security tier.
      */
-    public salter: any;
+    public salter: Salter;
     /**
      * The current signing key used to sign requests for this controller.
      */
