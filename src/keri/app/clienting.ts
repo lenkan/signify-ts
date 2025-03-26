@@ -136,7 +136,11 @@ export class SignifyClient {
         data: any,
         extraHeaders?: Headers
     ): Promise<Response> {
-        return await this.connection.fetch(path, method, data, extraHeaders);
+        return await this.connection.fetch(path, {
+            method,
+            body: data,
+            headers: extraHeaders,
+        });
     }
 
     /**
@@ -311,7 +315,7 @@ export class SignifyClient {
      * @returns {Challenges}
      */
     challenges(): Challenges {
-        return new Challenges(this);
+        return new Challenges(this.connection);
     }
 
     /**
@@ -319,7 +323,7 @@ export class SignifyClient {
      * @returns {Contacts}
      */
     contacts(): Contacts {
-        return new Contacts(this);
+        return new Contacts(this.connection);
     }
 
     /**

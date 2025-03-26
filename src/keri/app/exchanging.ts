@@ -1,4 +1,3 @@
-import { SignifyClient } from './clienting.ts';
 import { b, d, Dict, Protocols, Ilks, Serials, versify } from '../core/core.ts';
 import { Serder } from '../core/serder.ts';
 import { nowUTC } from '../core/utils.ts';
@@ -6,18 +5,19 @@ import { Pather } from '../core/pather.ts';
 import { Counter, CtrDex } from '../core/counter.ts';
 import { Saider } from '../core/saider.ts';
 import { HabState } from '../core/keyState.ts';
+import { Connection } from './connecting.ts';
 
 /**
  * Exchanges
  */
 export class Exchanges {
-    client: SignifyClient;
+    client: Connection;
 
     /**
      * Exchanges
-     * @param {SignifyClient} client
+     * @param {Connection} client
      */
-    constructor(client: SignifyClient) {
+    constructor(client: Connection) {
         this.client = client;
     }
 
@@ -127,7 +127,7 @@ export class Exchanges {
             rec: recipients,
         };
 
-        const res = await this.client.fetch(path, method, data);
+        const res = await this.client.fetch(path, { method, body: data });
         return await res.json();
     }
 
@@ -140,7 +140,7 @@ export class Exchanges {
     async get(said: string): Promise<any> {
         const path = `/exchanges/${said}`;
         const method = 'GET';
-        const res = await this.client.fetch(path, method, null);
+        const res = await this.client.fetch(path, { method, body: null });
         return await res.json();
     }
 }

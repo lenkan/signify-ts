@@ -87,16 +87,12 @@ export class Connection {
      * Fetch a resource from the KERIA agent
      * @async
      * @param {string} path Path to the resource
-     * @param {string} method HTTP method
-     * @param {any} data Data to be sent in the body of the resource
-     * @param {Headers} [extraHeaders] Optional extra headers to be sent with the request
+     * @param init HTTP method
      * @returns {Promise<Response>} A promise to the result of the fetch
      */
     async fetch(
         path: string,
-        method: string,
-        data: unknown,
-        extraHeaders?: Headers
+        init: { method: string; body: unknown; headers?: Headers }
     ): Promise<Response> {
         const headers = new Headers();
         let signed_headers = new Headers();
@@ -109,7 +105,9 @@ export class Connection {
         );
         headers.set('Content-Type', 'application/json');
 
-        const _body = method == 'GET' ? null : JSON.stringify(data);
+        const method = init.method ?? 'GET';
+
+        const _body = method == 'GET' ? null : JSON.stringify(init.body);
 
         if (this.authn) {
             signed_headers = this.authn.sign(
@@ -124,8 +122,8 @@ export class Connection {
         signed_headers.forEach((value, key) => {
             final_headers.set(key, value);
         });
-        if (extraHeaders !== undefined) {
-            extraHeaders.forEach((value, key) => {
+        if (init.headers !== undefined) {
+            init.headers.forEach((value, key) => {
                 final_headers.append(key, value);
             });
         }

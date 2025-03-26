@@ -1,9 +1,10 @@
-import { assert, describe, it } from 'vitest';
+import { assert, beforeEach, describe, it } from 'vitest';
 import {
     b,
     d,
     Diger,
     exchange,
+    Exchanges,
     Ilks,
     MtrDex,
     Salter,
@@ -11,13 +12,18 @@ import {
     Tier,
 } from '../../src/index.ts';
 import libsodium from 'libsodium-wrappers-sumo';
-import { SignifyClient } from '../../src/keri/app/clienting.ts';
-import { createMockFetch } from './test-utils.ts';
-
-const fetchMock = createMockFetch();
+import { MockConnection } from './test-utils.ts';
 
 const url = 'http://127.0.0.1:3901';
-const boot_url = 'http://127.0.0.1:3903';
+
+let exchanges: Exchanges;
+let connection: MockConnection;
+
+beforeEach(async () => {
+    await libsodium.ready;
+    connection = new MockConnection();
+    exchanges = new Exchanges(connection);
+});
 
 describe('exchange', () => {
     it('should create an exchange message with no transposed attachments', async () => {
@@ -172,15 +178,6 @@ describe('exchange', () => {
     });
 
     it('SendFromEvents', async () => {
-        await libsodium.ready;
-        const bran = '0123456789abcdefghijk';
-
-        const client = new SignifyClient(url, bran, Tier.low, boot_url);
-
-        await client.boot();
-        await client.connect();
-
-        const exchange = client.exchanges();
         const sith = 1;
         const nsith = 1;
         const sn = 0;
@@ -231,22 +228,16 @@ describe('exchange', () => {
 
         const serder = new Serder(ked0);
 
-        let lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1]!;
-        await exchange.sendFromEvents('aid1', '', serder, [''], '', []);
-        lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1]!;
+        let lastCall = connection.fetch.mock.lastCall!;
+        await exchanges.sendFromEvents('aid1', '', serder, [''], '', []);
+        lastCall = connection.fetch.mock.lastCall!;
         assert.equal(lastCall[0]!, url + '/identifiers/aid1/exchanges');
         assert.equal(lastCall[1]!.method, 'POST');
     });
 
     it('Get exchange', async () => {
-        await libsodium.ready;
-        const bran = '0123456789abcdefghijk';
-        const client = new SignifyClient(url, bran, Tier.low, boot_url);
-        await client.boot();
-        await client.connect();
-        const exchanges = client.exchanges();
         await exchanges.get('EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao');
-        const lastCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1]!;
+        const lastCall = connection.fetch.mock.lastCall!;
         assert.equal(
             lastCall[0]!,
             url + '/exchanges/EBfdlu8R27Fbx-ehrqwImnK-8Cm79sqbAQ4MmvEAYqao'

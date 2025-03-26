@@ -1,5 +1,7 @@
-import { SignifyClient } from './clienting.ts';
+import { Identifier } from './aiding.ts';
+import { Connection } from './connecting.ts';
 import { Operation } from './coring.ts';
+import { Exchanges } from './exchanging.ts';
 
 export interface Contact {
     alias: string;
@@ -16,13 +18,13 @@ export interface ContactInfo {
  * Contacts
  */
 export class Contacts {
-    client: SignifyClient;
+    client: Connection;
 
     /**
      * Contacts
-     * @param {SignifyClient} client
+     * @param {Connection} client
      */
-    constructor(client: SignifyClient) {
+    constructor(client: Connection) {
         this.client = client;
     }
 
@@ -50,7 +52,7 @@ export class Contacts {
 
         const path = `/contacts` + '?' + params.toString();
         const method = 'GET';
-        const res = await this.client.fetch(path, method, null);
+        const res = await this.client.fetch(path, { method, body: null });
         return await res.json();
     }
 
@@ -63,7 +65,7 @@ export class Contacts {
     async get(pre: string): Promise<Contact> {
         const path = `/contacts/` + pre;
         const method = 'GET';
-        const res = await this.client.fetch(path, method, null);
+        const res = await this.client.fetch(path, { method, body: null });
         return await res.json();
     }
 
@@ -78,7 +80,7 @@ export class Contacts {
         const path = `/contacts/` + pre;
         const method = 'POST';
 
-        const res = await this.client.fetch(path, method, info);
+        const res = await this.client.fetch(path, { method, body: info });
         return await res.json();
     }
 
@@ -92,7 +94,7 @@ export class Contacts {
         const path = `/contacts/` + pre;
         const method = 'DELETE';
 
-        await this.client.fetch(path, method, undefined);
+        await this.client.fetch(path, { method, body: undefined });
     }
 
     /**
@@ -106,7 +108,7 @@ export class Contacts {
         const path = `/contacts/` + pre;
         const method = 'PUT';
 
-        const res = await this.client.fetch(path, method, info);
+        const res = await this.client.fetch(path, { method, body: info });
         return await res.json();
     }
 }
@@ -119,13 +121,18 @@ export interface Challenge {
  * Challenges
  */
 export class Challenges {
-    client: SignifyClient;
+    private client: Connection;
+    private contacts: Contacts;
+    private exchanges: Exchanges;
+
     /**
      * Challenges
-     * @param {SignifyClient} client
+     * @param client
      */
-    constructor(client: SignifyClient) {
+    constructor(client: Connection) {
         this.client = client;
+        this.contacts = new Contacts(client);
+        this.exchanges = new Exchanges(client);
     }
 
     /**
@@ -137,7 +144,7 @@ export class Challenges {
     async generate(strength: number = 128): Promise<Challenge> {
         const path = `/challenges?strength=${strength.toString()}`;
         const method = 'GET';
-        const res = await this.client.fetch(path, method, null);
+        const res = await this.client.fetch(path, { method, body: null });
         return await res.json();
     }
 
@@ -154,8 +161,8 @@ export class Challenges {
         recipient: string,
         words: string[]
     ): Promise<unknown> {
-        const hab = await this.client.identifiers().get(name);
-        const exchanges = this.client.exchanges();
+        const hab = await new Identifier(this.client).get(name);
+        const exchanges = new Exchanges(this.client);
         const resp = await exchanges.send(
             name,
             'challenge',
@@ -180,7 +187,7 @@ export class Challenges {
         const data = {
             words: words,
         };
-        const res = await this.client.fetch(path, method, data);
+        const res = await this.client.fetch(path, { method, body: data });
 
         return await res.json();
     }
@@ -197,7 +204,7 @@ export class Challenges {
         const data = {
             said: said,
         };
-        const res = await this.client.fetch(path, method, data);
+        const res = await this.client.fetch(path, { method, body: data });
         return res;
     }
 }

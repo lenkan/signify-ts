@@ -1,4 +1,4 @@
-import { assert, describe, it, expect, beforeEach, vitest } from 'vitest';
+import { assert, describe, it, expect, beforeEach } from 'vitest';
 import {
     CreateIdentiferArgs,
     RotateIdentifierArgs,
@@ -6,36 +6,10 @@ import {
 import { Algos } from '../../src/keri/core/manager.ts';
 import libsodium from 'libsodium-wrappers-sumo';
 import { randomUUID } from 'node:crypto';
-import {
-    Controller,
-    Identifier,
-    Tier,
-    randomPasscode,
-} from '../../src/index.ts';
-import { createMockIdentifierState } from './test-utils.ts';
-import { Connection } from '../../src/keri/app/connecting.ts';
+import { Identifier, randomPasscode } from '../../src/index.ts';
+import { createMockIdentifierState, MockConnection } from './test-utils.ts';
 
 const bran = '0123456789abcdefghijk';
-
-export class MockConnection extends Connection {
-    pidx = 0;
-
-    fetch = vitest.fn();
-
-    constructor(bran: string) {
-        super({ url: '', controller: new Controller(bran, Tier.low) });
-    }
-
-    getLastMockRequest() {
-        const [pathname, method, body] = this.fetch.mock.lastCall ?? [];
-
-        return {
-            path: pathname,
-            method: method,
-            body: body,
-        };
-    }
-}
 
 let identifiers: Identifier;
 let connection: MockConnection;

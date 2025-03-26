@@ -18,6 +18,7 @@ import {
     HabState,
     KeyState,
 } from '../../src/keri/core/keyState.ts';
+import { Connection } from '../../src/keri/app/connecting.ts';
 
 const boot_url = 'http://127.0.0.1:3903';
 
@@ -365,3 +366,23 @@ export const mockCredential = {
         et: 'iss',
     },
 };
+
+export class MockConnection extends Connection {
+    pidx = 0;
+
+    fetch = vitest.fn();
+
+    constructor(bran: string = '0123456789abcdefghijk') {
+        super({ url: '', controller: new Controller(bran, Tier.low) });
+    }
+
+    getLastMockRequest() {
+        const [pathname, method, body] = this.fetch.mock.lastCall ?? [];
+
+        return {
+            path: pathname,
+            method: method,
+            body: body,
+        };
+    }
+}
