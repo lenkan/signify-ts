@@ -392,8 +392,12 @@ const decoder = new TextDecoder();
  * Output is an encoded array of bytes. Assumes UTF-8 encoding.
  * @param s string to be encoded as an array of bytes
  */
-export function b(s?: string): Uint8Array {
-    return encoder.encode(s);
+export function b(s: string = ''): Uint8Array {
+    if (typeof s !== 'string') {
+        throw new Error('Expected string, got ' + typeof s);
+    }
+
+    return encoder.encode(s ?? '');
 }
 
 /**

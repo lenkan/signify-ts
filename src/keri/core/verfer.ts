@@ -1,6 +1,6 @@
 import libsodium from 'libsodium-wrappers-sumo';
 import { Matter, MatterArgs, MtrDex } from './matter.ts';
-import { p256 } from '@noble/curves/p256';
+import { p256 } from '@noble/curves/nist.js';
 import { b } from './core.ts';
 
 const VERFER_CODES = new Set([
@@ -36,7 +36,11 @@ export class Verfer extends Matter {
             case MtrDex.ECDSA_256r1:
             case MtrDex.ECDSA_256r1N: {
                 const message = typeof ser === 'string' ? b(ser) : ser;
-                return p256.verify(sig, message, this.raw);
+                return p256.verify(sig, message, this.raw, {
+                    format: 'compact',
+                    lowS: false,
+                    prehash: false,
+                });
             }
             default:
                 throw new Error(

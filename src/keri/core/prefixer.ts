@@ -1,9 +1,9 @@
 import { Matter, MatterArgs, MtrDex } from './matter.ts';
 import { EmptyMaterialError } from './kering.ts';
-import { Dict, Ilks } from './core.ts';
+import { b, Dict, Ilks } from './core.ts';
 import { sizeify } from './serder.ts';
 import { Verfer } from './verfer.ts';
-import { blake3 } from '@noble/hashes/blake3';
+import { blake3 } from '@noble/hashes/blake3.js';
 
 const Dummy: string = '#';
 
@@ -148,7 +148,7 @@ export class Prefixer extends Matter {
         sad['i'] = ''.padStart(Matter.Sizes.get(MtrDex.Blake3_256)!.fs!, Dummy);
         sad['d'] = sad['i'];
         const [raw] = sizeify(sad);
-        const dig = blake3.create({ dkLen: 32 }).update(raw).digest();
+        const dig = blake3.create({ dkLen: 32 }).update(b(raw)).digest();
         return [dig, MtrDex.Blake3_256];
     }
 

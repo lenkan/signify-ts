@@ -2,7 +2,7 @@ import { MtrDex } from '../../src/keri/core/matter.ts';
 import libsodium from 'libsodium-wrappers-sumo';
 import { assert, describe, it, expect, beforeAll } from 'vitest';
 import { Verfer } from '../../src/keri/core/verfer.ts';
-import { p256 } from '@noble/curves/p256';
+import { p256 } from '@noble/curves/nist.js';
 import { b } from 'signify-ts';
 
 beforeAll(async () => {
@@ -83,9 +83,13 @@ describe('Verfer', () => {
                 code: MtrDex.ECDSA_256r1,
             });
 
-            const ser = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            const ser = b('abcdefghijklmnopqrstuvwxyz0123456789');
 
-            const sig = p256.sign(b(ser), privateKey).toCompactRawBytes();
+            const sig = p256.sign(ser, privateKey, {
+                format: 'compact',
+                lowS: false,
+                prehash: false,
+            });
 
             assert.deepEqual(
                 sig,

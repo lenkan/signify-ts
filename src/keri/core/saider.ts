@@ -1,8 +1,8 @@
 import { DigiDex, Matter, MatterArgs, MtrDex } from './matter.ts';
-import { deversify, Dict, Serials } from './core.ts';
+import { b, deversify, Dict, Serials } from './core.ts';
 import { EmptyMaterialError } from './kering.ts';
 import { dumps, sizeify } from './serder.ts';
-import { blake3 } from '@noble/hashes/blake3';
+import { blake3 } from '@noble/hashes/blake3.js';
 
 const Dummy = '#';
 
@@ -72,7 +72,10 @@ export class Saider extends Matter {
 
         switch (code) {
             case MtrDex.Blake3_256:
-                return [blake3.create({ dkLen: 32 }).update(cpa).digest(), sad];
+                return [
+                    blake3.create({ dkLen: 32 }).update(b(cpa)).digest(),
+                    sad,
+                ];
             default:
                 throw new Error(`Unsupported digest code = ${code}.`);
         }

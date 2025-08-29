@@ -1,6 +1,6 @@
 import { Matter } from '../../src/keri/core/matter.ts';
 import { assert, describe, it } from 'vitest';
-import { blake3 } from '@noble/hashes/blake3';
+import { blake3 } from '@noble/hashes/blake3.js';
 
 import { Diger } from '../../src/keri/core/diger.ts';
 import { MtrDex } from '../../src/keri/core/matter.ts';
